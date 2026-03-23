@@ -6,6 +6,11 @@ On-the-fly image transformation, AVIF/WebP conversion, and caching proxy for Lar
 
 - Automatic AVIF/WebP conversion with content negotiation (Accept header)
 - Resize, crop, and quality control via query parameters
+- Visual effects: blur, sharpen, grayscale, brightness, contrast
+- Rotation and flip (horizontal, vertical, both)
+- Watermark overlay with configurable position, opacity, and size
+- Focal point crop for smart cropping around a point of interest
+- Border radius (rounded corners) and padding with background color
 - LQIP (Low Quality Image Placeholder) support
 - Signed URLs with HMAC-SHA256 for abuse prevention
 - GD and Imagick driver support
@@ -96,6 +101,16 @@ return [
     'max_quality'     => 100,
     'default_quality' => 85,
 
+    // Effects limits
+    'max_blur' => 50,
+
+    // Watermark disk (falls back to source_disk when null)
+    'watermark_disk' => null,
+
+    // Border radius and padding limits
+    'max_border_radius' => 1000,
+    'max_padding'       => 500,
+
     // Max source file size in bytes (default: 10MB)
     'max_file_size' => 10 * 1024 * 1024,
 
@@ -118,13 +133,30 @@ This reads `photos/landscape.jpg` from the configured source disk, converts it t
 
 ### Query Parameters
 
-| Parameter | Type   | Description                              |
-|-----------|--------|------------------------------------------|
-| `w`       | int    | Target width (clamped to `max_width`)    |
-| `h`       | int    | Target height (clamped to `max_height`)  |
-| `fit`     | string | Resize mode: `crop` for cover-fit        |
-| `q`       | int    | Output quality (clamped between min/max) |
-| `lqip`    | bool   | Return a 20px low-quality placeholder    |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `w` | int | Target width (clamped to `max_width`) |
+| `h` | int | Target height (clamped to `max_height`) |
+| `fit` | string | Resize mode: `crop` for cover-fit |
+| `q` | int | Output quality (clamped between min/max) |
+| `lqip` | bool | Return a 20px low-quality placeholder |
+| `blur` | int | Blur radius, 0–`max_blur` (default 50) |
+| `sharpen` | int | Sharpen amount, 0–100 |
+| `grayscale` | bool | Convert to grayscale |
+| `brightness` | int | Brightness adjustment, -100 to 100 |
+| `contrast` | int | Contrast adjustment, -100 to 100 |
+| `rotate` | int | Rotation in degrees (mod 360) |
+| `flip` | string | Flip: `h` (horizontal), `v` (vertical), `both` |
+| `watermark` | string | Path to watermark image on watermark disk |
+| `watermark_position` | string | Watermark position (see below) |
+| `watermark_alpha` | int | Watermark opacity, 0–100 (default 50) |
+| `watermark_size` | int | Watermark width as % of image, 1–100 (default 25) |
+| `watermark_padding` | int | Watermark padding from edge, 0–100px (default 10) |
+| `focal_x` | float | Focal point X, 0.0–1.0 (used with `w` + `h`) |
+| `focal_y` | float | Focal point Y, 0.0–1.0 (used with `w` + `h`) |
+| `border_radius` | int | Rounded corners in pixels (clamped to `max_border_radius`) |
+| `padding` | int | Padding in pixels (clamped to `max_padding`) |
+| `bg` | string | Background hex color for padding/rotation (e.g. `ff0000` or `f00`) |
 
 **Examples:**
 
@@ -133,6 +165,70 @@ This reads `photos/landscape.jpg` from the configured source disk, converts it t
 /img/photos/landscape.jpg?w=400&h=400&fit=crop
 /img/photos/landscape.jpg?w=1200&q=60
 /img/photos/landscape.jpg?lqip=1
+```
+
+### Effects
+
+Apply visual effects to any image:
+
+```
+/img/photos/landscape.jpg?blur=10
+/img/photos/landscape.jpg?sharpen=15
+/img/photos/landscape.jpg?grayscale=1
+/img/photos/landscape.jpg?brightness=20
+/img/photos/landscape.jpg?contrast=-10
+```
+
+Combine effects with resize:
+
+```
+/img/photos/landscape.jpg?w=800&blur=5&grayscale=1
+```
+
+### Rotation & Flip
+
+```
+/img/photos/landscape.jpg?rotate=90
+/img/photos/landscape.jpg?rotate=180&bg=000000
+/img/photos/landscape.jpg?flip=h
+/img/photos/landscape.jpg?flip=v
+/img/photos/landscape.jpg?flip=both
+```
+
+The `bg` parameter sets the background color for areas exposed by rotation. Defaults to white.
+
+### Watermark
+
+Overlay a watermark image on any processed image:
+
+```
+/img/photos/landscape.jpg?watermark=watermarks/logo.png
+/img/photos/landscape.jpg?watermark=watermarks/logo.png&watermark_position=top-left&watermark_alpha=80
+/img/photos/landscape.jpg?watermark=watermarks/logo.png&watermark_size=15&watermark_padding=20
+```
+
+**Watermark positions:** `top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, `bottom-right`
+
+Watermark images are read from the `watermark_disk` (falls back to `source_disk`). Returns 404 if the watermark file doesn't exist.
+
+### Focal Point Crop
+
+Crop around a specific point of interest instead of the center:
+
+```
+/img/photos/portrait.jpg?w=300&h=300&focal_x=0.3&focal_y=0.2
+```
+
+Both `focal_x` and `focal_y` must be provided along with `w` and `h`. Values are clamped to 0.0–1.0, where (0,0) is the top-left corner and (1,1) is the bottom-right.
+
+### Border Radius & Padding
+
+Add rounded corners and padding:
+
+```
+/img/photos/avatar.jpg?w=200&h=200&fit=crop&border_radius=100
+/img/photos/product.jpg?padding=20&bg=f5f5f5
+/img/photos/avatar.jpg?w=200&h=200&fit=crop&border_radius=20&padding=10&bg=ffffff
 ```
 
 ### Generating URLs

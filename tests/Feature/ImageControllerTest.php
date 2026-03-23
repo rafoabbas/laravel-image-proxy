@@ -304,3 +304,193 @@ test('signing middleware passes through when signing disabled', function (): voi
     $this->get(route('image-proxy', ['path' => 'test/nosign.jpg']))
         ->assertOk();
 });
+
+// --- New transformation feature tests ---
+
+test('applies blur via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/blur.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/blur.jpg', 'blur' => 10]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies grayscale via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/gray.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/gray.jpg', 'grayscale' => 1]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies rotate via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/rotate.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/rotate.jpg', 'rotate' => 90]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies flip via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/flip.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/flip.jpg', 'flip' => 'h']))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies brightness via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/bright.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/bright.jpg', 'brightness' => 30]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies contrast via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/contrast.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/contrast.jpg', 'contrast' => -20]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies sharpen via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/sharpen.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/sharpen.jpg', 'sharpen' => 15]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies watermark with valid file', function (): void {
+    $imageBytes = createTestImage(400, 400);
+    Storage::disk('public')->put('test/wm.jpg', $imageBytes);
+
+    $wmBytes = createTestImage(50, 50);
+    Storage::disk('public')->put('watermarks/logo.png', $wmBytes);
+
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/wm.jpg',
+        'watermark' => 'watermarks/logo.png',
+    ]))->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('returns 404 for missing watermark file', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/nowm.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/nowm.jpg',
+        'watermark' => 'watermarks/nonexistent.png',
+    ]))->assertStatus(404);
+});
+
+test('applies focal point crop via HTTP', function (): void {
+    $imageBytes = createTestImage(800, 600);
+    Storage::disk('public')->put('test/focal.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/focal.jpg',
+        'w' => 200,
+        'h' => 200,
+        'focal_x' => '0.3',
+        'focal_y' => '0.7',
+    ]))->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies border radius via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/radius.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/radius.jpg',
+        'border_radius' => 20,
+    ]))->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies padding with background color via HTTP', function (): void {
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/pad.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/pad.jpg',
+        'padding' => 20,
+        'bg' => 'ff0000',
+    ]))->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('applies multiple parameters combined', function (): void {
+    $imageBytes = createTestImage(800, 600);
+    Storage::disk('public')->put('test/combo.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/combo.jpg',
+        'w' => 400,
+        'h' => 300,
+        'fit' => 'crop',
+        'blur' => 5,
+        'grayscale' => 1,
+        'q' => 70,
+    ]))->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('clamps blur parameter', function (): void {
+    config()->set('image-proxy.max_blur', 50);
+
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/clampblur.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    // Even with blur=999, it should be clamped and still work
+    $this->get(route('image-proxy', ['path' => 'test/clampblur.jpg', 'blur' => 999]))
+        ->assertOk();
+});
+
+test('clamps border radius parameter', function (): void {
+    config()->set('image-proxy.max_border_radius', 1000);
+
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/clampradius.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/clampradius.jpg', 'border_radius' => 5000]))
+        ->assertOk();
+});
+
+test('clamps padding parameter', function (): void {
+    config()->set('image-proxy.max_padding', 500);
+
+    $imageBytes = createTestImage(200, 200);
+    Storage::disk('public')->put('test/clamppad.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/clamppad.jpg', 'padding' => 9999]))
+        ->assertOk();
+});

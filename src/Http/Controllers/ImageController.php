@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use ImageProxy\Data\ImageRequestData;
 use ImageProxy\Services\FilesystemSourceResolver;
 use ImageProxy\Services\ImageCacheService;
@@ -74,13 +75,18 @@ class ImageController
                 $originalBytes = $source->bytes;
                 $this->memoryGuard->check($originalBytes);
 
-                if (! $this->transformer->needsTransform($params->width, $params->height, $params->fit, $params->quality, $source->mimeType, $format)) {
+                if ($params->watermark !== null) {
+                    $watermarkDisk = $config['watermark_disk'] ?? $config['source_disk'];
+                    abort_unless(Storage::disk($watermarkDisk)->exists($params->watermark), 404, 'Watermark image not found');
+                }
+
+                if (! $this->transformer->needsTransform($params, $source->mimeType, $format)) {
                     $this->cache->put($cachePath, $originalBytes);
 
                     return $this->response->respond($request, $originalBytes, $cacheKey, $config['cache_max_age'], format: $format);
                 }
 
-                $bytes = $this->transformer->transform($originalBytes, $params->width, $params->height, $params->fit, $params->quality, $format);
+                $bytes = $this->transformer->transform($params, $originalBytes, $format);
                 $this->cache->put($cachePath, $bytes);
 
                 return $this->response->respond($request, $bytes, $cacheKey, $config['cache_max_age'], format: $format);
