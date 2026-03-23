@@ -15,43 +15,43 @@ function createJpegBytes(int $width = 100, int $height = 100): string
     return $image->encode(new JpegEncoder(quality: 85))->toString();
 }
 
-test('needs transform when width is set', function () {
+test('needs transform when width is set', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(400, null, null, 85, 'image/webp'))->toBeTrue();
 });
 
-test('needs transform when height is set', function () {
+test('needs transform when height is set', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(null, 300, null, 85, 'image/webp'))->toBeTrue();
 });
 
-test('needs transform when fit is set', function () {
+test('needs transform when fit is set', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(null, null, 'crop', 85, 'image/webp'))->toBeTrue();
 });
 
-test('needs transform when quality differs from default', function () {
+test('needs transform when quality differs from default', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(null, null, null, 50, 'image/webp'))->toBeTrue();
 });
 
-test('needs transform when mime type is not webp', function () {
+test('needs transform when mime type is not webp', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(null, null, null, 85, 'image/jpeg'))->toBeTrue();
 });
 
-test('does not need transform for default webp without params', function () {
+test('does not need transform for default webp without params', function (): void {
     $transformer = new ImageTransformer;
 
     expect($transformer->needsTransform(null, null, null, 85, 'image/webp'))->toBeFalse();
 });
 
-test('transforms image with width', function () {
+test('transforms image with width', function (): void {
     $transformer = new ImageTransformer;
     $bytes = createJpegBytes(800, 600);
 
@@ -60,7 +60,7 @@ test('transforms image with width', function () {
     expect($result)->toBeString()->not->toBeEmpty();
 });
 
-test('transforms image with crop', function () {
+test('transforms image with crop', function (): void {
     $transformer = new ImageTransformer;
     $bytes = createJpegBytes(800, 600);
 
@@ -69,7 +69,7 @@ test('transforms image with crop', function () {
     expect($result)->toBeString()->not->toBeEmpty();
 });
 
-test('transforms image with different quality levels', function () {
+test('transforms image with different quality levels', function (): void {
     $transformer = new ImageTransformer;
     $bytes = createJpegBytes(800, 600);
 

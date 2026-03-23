@@ -7,10 +7,12 @@ namespace ImageProxy\Http\Controllers;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use ImageProxy\Contracts\ImageSourceResolverInterface;
+use ImageProxy\Data\ImageRequestData;
+use ImageProxy\Services\FilesystemSourceResolver;
+use ImageProxy\Services\ImageCacheService;
+use ImageProxy\Services\ImageResponseBuilder;
 use ImageProxy\Services\ImageTransformer;
+use ImageProxy\Services\UrlSourceResolver;
 use Intervention\Image\Exceptions\DecoderException;
 use League\Flysystem\FilesystemException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -18,118 +20,58 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class ImageController
 {
     public function __construct(
-        private ImageSourceResolverInterface $sourceResolver,
-        private ImageTransformer $transformer,
+        private readonly ImageCacheService $cache,
+        private readonly ImageTransformer $transformer,
+        private readonly ImageResponseBuilder $response,
+        private readonly FilesystemSourceResolver $filesystemResolver,
+        private readonly UrlSourceResolver $urlResolver,
     ) {}
 
     public function __invoke(Request $request, string $path): Response
     {
         try {
-            $path = ltrim($path, '/');
-            abort_if(Str::contains($path, ['..', "\0"]), 400, 'Invalid path');
+            $params = ImageRequestData::fromRequest($request, $path);
 
+            $cacheKey = $this->cache->buildCacheKey($params->path, $request->query());
+            $cachePath = $this->cache->buildCachePath($cacheKey);
             $config = config('image-proxy');
 
-            $w = $request->integer('w') ?: null;
-            $h = $request->integer('h') ?: null;
-            $fit = $request->query('fit');
-            $q = $request->integer('q') ?: $config['default_quality'];
-
-            $w = $w ? max(1, min($w, $config['max_width'])) : null;
-            $h = $h ? max(1, min($h, $config['max_height'])) : null;
-            $q = max($config['min_quality'], min($q, $config['max_quality']));
-
-            $query = $request->query();
-            ksort($query);
-            $cacheKey = sha1($path . '|' . http_build_query($query));
-
-            $cacheDisk = $config['cache_disk'];
-            $cachePath = substr($cacheKey, 0, 2) . '/' . $cacheKey . '.webp';
-
-            if (Storage::disk($cacheDisk)->exists($cachePath)) {
-                return $this->respondFromCache($cacheDisk, $cachePath, $cacheKey, $config['cache_max_age']);
+            if ($this->cache->has($cachePath)) {
+                return $this->response->respond(
+                    $this->cache->get($cachePath), $cacheKey, $config['cache_max_age'],
+                    $this->cache->lastModified($cachePath),
+                );
             }
 
-            $source = $this->sourceResolver->resolve($path);
+            $isUrl = str_starts_with($params->path, 'http://') || str_starts_with($params->path, 'https://');
+            $source = $isUrl
+                ? $this->urlResolver->resolve($params->path)
+                : $this->filesystemResolver->resolve($params->path);
+
             abort_unless($source, 404, 'Image not found');
+            abort_unless(in_array($source['mime_type'], $config['allowed_mime_types']), 415, 'Unsupported image type');
 
-            abort_unless(
-                in_array($source['mime_type'], $config['allowed_mime_types']),
-                415,
-                'Unsupported image type',
-            );
+            $originalBytes = $source['bytes'];
 
-            $sourceDisk = $source['disk'];
-            $remoteDisksList = $config['remote_disks'] ?? [];
-            $originalBytes = $this->fetchOriginalBytes($sourceDisk, $path, $cacheDisk, $remoteDisksList);
+            if (! $this->transformer->needsTransform($params->width, $params->height, $params->fit, $params->quality, $source['mime_type'])) {
+                $this->cache->put($cachePath, $originalBytes);
 
-            if (! $this->transformer->needsTransform($w, $h, $fit, $q, $source['mime_type'])) {
-                Storage::disk($cacheDisk)->put($cachePath, $originalBytes);
-
-                return $this->respond($originalBytes, $cacheKey, $config['cache_max_age']);
+                return $this->response->respond($originalBytes, $cacheKey, $config['cache_max_age']);
             }
 
-            $bytes = $this->transformer->transform($originalBytes, $w, $h, $fit, $q);
+            $bytes = $this->transformer->transform($originalBytes, $params->width, $params->height, $params->fit, $params->quality);
+            $this->cache->put($cachePath, $bytes);
 
-            Storage::disk($cacheDisk)->put($cachePath, $bytes);
-
-            return $this->respond($bytes, $cacheKey, $config['cache_max_age']);
+            return $this->response->respond($bytes, $cacheKey, $config['cache_max_age']);
         } catch (HttpException $e) {
             throw $e;
         } catch (DecoderException) {
             abort(422, 'Invalid or corrupted image file');
         } catch (FilesystemException) {
             abort(500, 'Storage error');
-        } catch (Exception) {
+        } catch (Exception $e) {
+            dd($e);
             abort(500, 'Image processing failed');
         }
-    }
-
-    private function fetchOriginalBytes(string $sourceDisk, string $path, string $cacheDisk, array $remoteDisksList): string
-    {
-        if (in_array($sourceDisk, $remoteDisksList)) {
-            $originalCachePath = 'originals/' . $path;
-
-            if (Storage::disk($cacheDisk)->exists($originalCachePath)) {
-                return Storage::disk($cacheDisk)->read($originalCachePath);
-            }
-
-            abort_unless(Storage::disk($sourceDisk)->exists($path), 404, 'Source file not found');
-            $originalBytes = Storage::disk($sourceDisk)->read($path);
-            Storage::disk($cacheDisk)->put($originalCachePath, $originalBytes);
-
-            return $originalBytes;
-        }
-
-        abort_unless(Storage::disk($sourceDisk)->exists($path), 404, 'Source file not found');
-
-        return Storage::disk($sourceDisk)->read($path);
-    }
-
-    private function respondFromCache(string $cacheDisk, string $cachePath, string $cacheKey, int $maxAge): Response
-    {
-        $cachedFile = Storage::disk($cacheDisk)->path($cachePath);
-        $lastModified = filemtime($cachedFile);
-
-        return $this->respond(
-            Storage::disk($cacheDisk)->read($cachePath),
-            $cacheKey,
-            $maxAge,
-            $lastModified,
-        );
-    }
-
-    private function respond(string $bytes, string $cacheKey, int $maxAge, ?int $lastModified = null): Response
-    {
-        $response = response($bytes)
-            ->header('Content-Type', 'image/webp')
-            ->header('Cache-Control', 'public, max-age=' . $maxAge . ', immutable')
-            ->header('ETag', '"' . $cacheKey . '"');
-
-        if ($lastModified) {
-            $response->header('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
-        }
-
-        return $response;
     }
 }

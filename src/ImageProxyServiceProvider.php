@@ -7,9 +7,9 @@ namespace ImageProxy;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use ImageProxy\Console\Commands\ClearImageCacheCommand;
-use ImageProxy\Contracts\ImageSourceResolverInterface;
 use ImageProxy\Http\Controllers\ImageController;
-use ImageProxy\Services\FilesystemSourceResolver;
+use ImageProxy\Services\ImageCacheService;
+use ImageProxy\Services\ImageResponseBuilder;
 
 class ImageProxyServiceProvider extends ServiceProvider
 {
@@ -17,9 +17,8 @@ class ImageProxyServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/image-proxy.php', 'image-proxy');
 
-        $this->app->bind(ImageSourceResolverInterface::class, function ($app): ImageSourceResolverInterface {
-            return $app->make(FilesystemSourceResolver::class);
-        });
+        $this->app->singleton(ImageCacheService::class);
+        $this->app->singleton(ImageResponseBuilder::class);
     }
 
     public function boot(): void

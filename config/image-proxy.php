@@ -23,7 +23,7 @@ return [
     | You should create a dedicated disk for this in filesystems.php.
     |
     */
-    'cache_disk' => env('IMAGE_PROXY_CACHE_DISK', 'image-proxy-cache'),
+    'cache_disk' => env('IMAGE_PROXY_CACHE_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -36,6 +36,18 @@ return [
     |
     */
     'remote_disks' => ['s3', 'r2', 'gcs'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Allowed Domains
+    |--------------------------------------------------------------------------
+    |
+    | List of external domains from which images can be fetched.
+    | Example: ['example.com', 'cdn.example.com']
+    | Leave empty to disable external URL fetching.
+    |
+    */
+    'allowed_domains' => [],
 
     /*
     |--------------------------------------------------------------------------

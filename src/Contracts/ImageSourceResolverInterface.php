@@ -7,9 +7,9 @@ namespace ImageProxy\Contracts;
 interface ImageSourceResolverInterface
 {
     /**
-     * Resolve a path to its source disk and MIME type.
+     * Resolve a path to its source metadata, MIME type, and bytes.
      *
-     * @return array{disk: string, mime_type: string}|null
+     * @return array{source: string, mime_type: string, bytes: string, disk?: string}|null
      */
     public function resolve(string $path): ?array;
 }
