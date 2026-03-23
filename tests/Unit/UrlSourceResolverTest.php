@@ -32,10 +32,10 @@ test('resolves external url with allowed domain', function (): void {
     $resolver = new UrlSourceResolver;
     $result = $resolver->resolve('https://example.com/photo.jpg');
 
-    expect($result)->toBeArray()
-        ->and($result['source'])->toBe('url')
-        ->and($result['mime_type'])->toBe('image/jpeg')
-        ->and($result['bytes'])->toBe($imageBytes);
+    expect($result)->toBeInstanceOf(\ImageProxy\Data\ImageSourceData::class)
+        ->and($result->source)->toBe('url')
+        ->and($result->mimeType)->toBe('image/jpeg')
+        ->and($result->bytes)->toBe($imageBytes);
 });
 
 test('aborts with 403 for disallowed domain', function (): void {

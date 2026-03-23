@@ -27,6 +27,56 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Image Driver
+    |--------------------------------------------------------------------------
+    |
+    | The image processing driver to use. Supported: "gd", "imagick".
+    | GD is available by default in most PHP installations.
+    | Imagick provides better quality and AVIF support.
+    |
+    */
+    'driver' => env('IMAGE_PROXY_DRIVER', 'gd'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Output Formats
+    |--------------------------------------------------------------------------
+    |
+    | Priority-ordered list of output formats. The first format supported
+    | by the client's Accept header will be used. Supported: "avif", "webp".
+    | AVIF requires Imagick driver with libavif support.
+    |
+    */
+    'formats' => ['avif', 'webp'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | URL Signing
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, all image URLs must include a valid HMAC-SHA256 signature.
+    | This prevents abuse by ensuring only your application can generate
+    | valid image URLs. Use ImageProxy::url() to generate signed URLs.
+    |
+    */
+    'signing' => [
+        'enabled' => env('IMAGE_PROXY_SIGNING_ENABLED', false),
+        'key' => env('IMAGE_PROXY_SIGNING_KEY'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Remote Originals
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, original files fetched from remote disks (S3, R2, GCS)
+    | will be cached locally to avoid repeated downloads.
+    |
+    */
+    'cache_remote_originals' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Remote Disks
     |--------------------------------------------------------------------------
     |
@@ -77,6 +127,7 @@ return [
         'image/png',
         'image/webp',
         'image/gif',
+        'image/avif',
     ],
 
     /*
@@ -92,10 +143,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Maximum Pixel Count
+    |--------------------------------------------------------------------------
+    |
+    | Maximum total pixel count (width x height) allowed for processing.
+    | This prevents memory exhaustion from extremely large images.
+    | Default: 25 million pixels (~5700x4400, ~120MB GD memory).
+    |
+    */
+    'max_pixel_count' => 25_000_000,
+
+    /*
+    |--------------------------------------------------------------------------
     | Quality Settings
     |--------------------------------------------------------------------------
     |
-    | Control the WebP output quality.
+    | Control the output quality for WebP and AVIF encoding.
     |
     */
     'min_quality' => 40,

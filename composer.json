@@ -26,11 +26,14 @@
     },
     "require": {
         "php": "^8.2",
-        "ext-gd": "*",
         "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
         "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
         "illuminate/routing": "^10.0|^11.0|^12.0|^13.0",
         "intervention/image": "^3.0"
+    },
+    "suggest": {
+        "ext-gd": "Required when using the GD driver (default)",
+        "ext-imagick": "Required when using the Imagick driver (enables AVIF support)"
     },
     "require-dev": {
         "laravel/pint": "^1.27",
@@ -53,7 +56,10 @@
         "laravel": {
             "providers": [
                 "ImageProxy\\ImageProxyServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "ImageProxy": "ImageProxy\\Facades\\ImageProxy"
+            }
         }
     },
     "scripts": {

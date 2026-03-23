@@ -6,16 +6,11 @@ namespace ImageProxy\Services;
 
 use Illuminate\Support\Facades\Storage;
 use ImageProxy\Contracts\ImageSourceResolverInterface;
+use ImageProxy\Data\ImageSourceData;
 
 class FilesystemSourceResolver implements ImageSourceResolverInterface
 {
-    /**
-     * Resolve a path by checking if the file exists on the configured source disk.
-     * The MIME type is detected from the file itself. Bytes are fetched (with remote disk caching).
-     *
-     * @return array{source: string, disk: string, mime_type: string, bytes: string}|null
-     */
-    public function resolve(string $path): ?array
+    public function resolve(string $path): ?ImageSourceData
     {
         $disk = config('image-proxy.source_disk');
 
@@ -31,20 +26,21 @@ class FilesystemSourceResolver implements ImageSourceResolverInterface
 
         $bytes = $this->fetchBytes($disk, $path);
 
-        return [
-            'source' => 'disk',
-            'disk' => $disk,
-            'mime_type' => $mimeType,
-            'bytes' => $bytes,
-        ];
+        return new ImageSourceData(
+            source: 'disk',
+            mimeType: $mimeType,
+            bytes: $bytes,
+            disk: $disk,
+        );
     }
 
     private function fetchBytes(string $sourceDisk, string $path): string
     {
         $remoteDisksList = config('image-proxy.remote_disks', []);
+        $cacheRemote = config('image-proxy.cache_remote_originals', true);
         $cacheDisk = config('image-proxy.cache_disk');
 
-        if (in_array($sourceDisk, $remoteDisksList)) {
+        if ($cacheRemote && in_array($sourceDisk, $remoteDisksList)) {
             $originalCachePath = 'originals/' . $path;
 
             if (Storage::disk($cacheDisk)->exists($originalCachePath)) {

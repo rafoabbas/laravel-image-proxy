@@ -9,20 +9,27 @@ use Illuminate\Http\Response;
 
 class ImageResponseBuilder
 {
-    public function respond(Request $request, string $bytes, string $cacheKey, int $maxAge, ?int $lastModified = null): Response
+    public function respond(Request $request, string $bytes, string $cacheKey, int $maxAge, ?int $lastModified = null, string $format = 'webp'): Response
     {
         $etag = '"' . $cacheKey . '"';
 
         if ($this->isNotModified($request, $etag, $lastModified)) {
             return response('', 304)
                 ->header('Cache-Control', 'public, max-age=' . $maxAge . ', immutable')
-                ->header('ETag', $etag);
+                ->header('ETag', $etag)
+                ->header('Vary', 'Accept');
         }
 
+        $contentType = match ($format) {
+            'avif' => 'image/avif',
+            default => 'image/webp',
+        };
+
         $response = response($bytes)
-            ->header('Content-Type', 'image/webp')
+            ->header('Content-Type', $contentType)
             ->header('Cache-Control', 'public, max-age=' . $maxAge . ', immutable')
-            ->header('ETag', $etag);
+            ->header('ETag', $etag)
+            ->header('Vary', 'Accept');
 
         if ($lastModified) {
             $response->header('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');

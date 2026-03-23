@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Storage;
+use ImageProxy\Data\ImageSourceData;
 use ImageProxy\Services\FilesystemSourceResolver;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\JpegEncoder;
@@ -33,18 +34,18 @@ function fakeFilesystemResolver(string $disk, string $mimeType): void
                 private readonly string $fakeMimeType,
             ) {}
 
-            public function resolve(string $path): ?array
+            public function resolve(string $path): ?ImageSourceData
             {
                 if (! Storage::disk($this->fakeDisk)->exists($path)) {
                     return null;
                 }
 
-                return [
-                    'source' => 'disk',
-                    'disk' => $this->fakeDisk,
-                    'mime_type' => $this->fakeMimeType,
-                    'bytes' => Storage::disk($this->fakeDisk)->read($path),
-                ];
+                return new ImageSourceData(
+                    source: 'disk',
+                    mimeType: $this->fakeMimeType,
+                    bytes: Storage::disk($this->fakeDisk)->read($path),
+                    disk: $this->fakeDisk,
+                );
             }
         },
     );

@@ -7,15 +7,11 @@ namespace ImageProxy\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use ImageProxy\Contracts\ImageSourceResolverInterface;
+use ImageProxy\Data\ImageSourceData;
 
 class UrlSourceResolver implements ImageSourceResolverInterface
 {
-    /**
-     * Resolve an external URL: validate domain, block internal IPs, fetch bytes (with originals cache), detect MIME.
-     *
-     * @return array{source: string, mime_type: string, bytes: string}|null
-     */
-    public function resolve(string $path): ?array
+    public function resolve(string $path): ?ImageSourceData
     {
         $config = config('image-proxy');
 
@@ -36,11 +32,11 @@ class UrlSourceResolver implements ImageSourceResolverInterface
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->buffer($bytes);
 
-        return [
-            'source' => 'url',
-            'mime_type' => $mimeType,
-            'bytes' => $bytes,
-        ];
+        return new ImageSourceData(
+            source: 'url',
+            mimeType: $mimeType,
+            bytes: $bytes,
+        );
     }
 
     private function isInternalHost(string $host): bool

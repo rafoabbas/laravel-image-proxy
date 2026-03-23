@@ -15,16 +15,18 @@ class ImageCacheService
         $this->disk = config('image-proxy.cache_disk');
     }
 
-    public function buildCacheKey(string $path, array $query): string
+    public function buildCacheKey(string $path, array $query, string $format = 'webp'): string
     {
         ksort($query);
 
-        return sha1($path . '|' . http_build_query($query));
+        return sha1($path . '|' . http_build_query($query) . '|' . $format);
     }
 
-    public function buildCachePath(string $cacheKey): string
+    public function buildCachePath(string $cacheKey, string $format = 'webp'): string
     {
-        return substr($cacheKey, 0, 2) . '/' . $cacheKey . '.webp';
+        $ext = $format === 'avif' ? 'avif' : 'webp';
+
+        return substr($cacheKey, 0, 2) . '/' . $cacheKey . '.' . $ext;
     }
 
     public function has(string $cachePath): bool

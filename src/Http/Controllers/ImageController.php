@@ -7,11 +7,15 @@ namespace ImageProxy\Http\Controllers;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use ImageProxy\Data\ImageRequestData;
 use ImageProxy\Services\FilesystemSourceResolver;
 use ImageProxy\Services\ImageCacheService;
+use ImageProxy\Services\ImageFormatNegotiator;
 use ImageProxy\Services\ImageResponseBuilder;
 use ImageProxy\Services\ImageTransformer;
+use ImageProxy\Services\MemoryGuard;
 use ImageProxy\Services\UrlSourceResolver;
 use Intervention\Image\Exceptions\DecoderException;
 use League\Flysystem\FilesystemException;
@@ -23,6 +27,8 @@ class ImageController
         private readonly ImageCacheService $cache,
         private readonly ImageTransformer $transformer,
         private readonly ImageResponseBuilder $response,
+        private readonly ImageFormatNegotiator $formatNegotiator,
+        private readonly MemoryGuard $memoryGuard,
         private readonly FilesystemSourceResolver $filesystemResolver,
         private readonly UrlSourceResolver $urlResolver,
     ) {}
@@ -31,46 +37,66 @@ class ImageController
     {
         try {
             $params = ImageRequestData::fromRequest($request, $path);
+            $format = $this->formatNegotiator->negotiate($request);
 
-            $cacheKey = $this->cache->buildCacheKey($params->path, $request->query());
-            $cachePath = $this->cache->buildCachePath($cacheKey);
+            $cacheKey = $this->cache->buildCacheKey($params->path, $request->query(), $format);
+            $cachePath = $this->cache->buildCachePath($cacheKey, $format);
             $config = config('image-proxy');
 
             if ($this->cache->has($cachePath)) {
                 return $this->response->respond(
                     $request, $this->cache->get($cachePath), $cacheKey, $config['cache_max_age'],
-                    $this->cache->lastModified($cachePath),
+                    $this->cache->lastModified($cachePath), $format,
                 );
             }
 
-            $isUrl = str_starts_with($params->path, 'http://') || str_starts_with($params->path, 'https://');
-            $source = $isUrl
-                ? $this->urlResolver->resolve($params->path)
-                : $this->filesystemResolver->resolve($params->path);
+            $lock = Cache::lock('img:' . $cacheKey, 10);
 
-            abort_unless($source, 404, 'Image not found');
-            abort_unless(in_array($source['mime_type'], $config['allowed_mime_types']), 415, 'Unsupported image type');
-            abort_if(strlen($source['bytes']) > $config['max_file_size'], 413, 'Image exceeds maximum allowed file size');
+            try {
+                $lock->block(10);
 
-            $originalBytes = $source['bytes'];
+                if ($this->cache->has($cachePath)) {
+                    return $this->response->respond(
+                        $request, $this->cache->get($cachePath), $cacheKey, $config['cache_max_age'],
+                        $this->cache->lastModified($cachePath), $format,
+                    );
+                }
 
-            if (! $this->transformer->needsTransform($params->width, $params->height, $params->fit, $params->quality, $source['mime_type'])) {
-                $this->cache->put($cachePath, $originalBytes);
+                $isUrl = str_starts_with($params->path, 'http://') || str_starts_with($params->path, 'https://');
+                $source = $isUrl
+                    ? $this->urlResolver->resolve($params->path)
+                    : $this->filesystemResolver->resolve($params->path);
 
-                return $this->response->respond($request, $originalBytes, $cacheKey, $config['cache_max_age']);
+                abort_unless($source, 404, 'Image not found');
+                abort_unless(in_array($source->mimeType, $config['allowed_mime_types']), 415, 'Unsupported image type');
+                abort_if(strlen($source->bytes) > $config['max_file_size'], 413, 'Image exceeds maximum allowed file size');
+
+                $originalBytes = $source->bytes;
+                $this->memoryGuard->check($originalBytes);
+
+                if (! $this->transformer->needsTransform($params->width, $params->height, $params->fit, $params->quality, $source->mimeType, $format)) {
+                    $this->cache->put($cachePath, $originalBytes);
+
+                    return $this->response->respond($request, $originalBytes, $cacheKey, $config['cache_max_age'], format: $format);
+                }
+
+                $bytes = $this->transformer->transform($originalBytes, $params->width, $params->height, $params->fit, $params->quality, $format);
+                $this->cache->put($cachePath, $bytes);
+
+                return $this->response->respond($request, $bytes, $cacheKey, $config['cache_max_age'], format: $format);
+            } finally {
+                $lock->release();
             }
-
-            $bytes = $this->transformer->transform($originalBytes, $params->width, $params->height, $params->fit, $params->quality);
-            $this->cache->put($cachePath, $bytes);
-
-            return $this->response->respond($request, $bytes, $cacheKey, $config['cache_max_age']);
         } catch (HttpException $e) {
             throw $e;
-        } catch (DecoderException) {
+        } catch (DecoderException $e) {
+            Log::warning('Image proxy: invalid image', ['path' => $path, 'error' => $e->getMessage()]);
             abort(422, 'Invalid or corrupted image file');
-        } catch (FilesystemException) {
+        } catch (FilesystemException $e) {
+            Log::error('Image proxy: storage error', ['path' => $path, 'error' => $e->getMessage()]);
             abort(500, 'Storage error');
-        } catch (Exception) {
+        } catch (Exception $e) {
+            Log::error('Image proxy: processing failed', ['path' => $path, 'error' => $e->getMessage()]);
             abort(500, 'Image processing failed');
         }
     }

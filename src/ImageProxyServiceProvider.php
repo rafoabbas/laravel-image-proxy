@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace ImageProxy;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use ImageProxy\Console\Commands\ClearImageCacheCommand;
 use ImageProxy\Http\Controllers\ImageController;
+use ImageProxy\Http\Middleware\VerifyImageSignature;
 use ImageProxy\Services\ImageCacheService;
+use ImageProxy\Services\ImageProxyManager;
 use ImageProxy\Services\ImageResponseBuilder;
+use ImageProxy\Services\UrlSigner;
 
 class ImageProxyServiceProvider extends ServiceProvider
 {
@@ -19,6 +23,8 @@ class ImageProxyServiceProvider extends ServiceProvider
 
         $this->app->singleton(ImageCacheService::class);
         $this->app->singleton(ImageResponseBuilder::class);
+        $this->app->singleton(UrlSigner::class);
+        $this->app->singleton(ImageProxyManager::class);
     }
 
     public function boot(): void
@@ -34,6 +40,7 @@ class ImageProxyServiceProvider extends ServiceProvider
         }
 
         $this->registerRoutes();
+        $this->registerBladeDirectives();
     }
 
     protected function registerRoutes(): void
@@ -46,10 +53,18 @@ class ImageProxyServiceProvider extends ServiceProvider
         $middleware = config('image-proxy.route.middleware', ['web']);
         $name = config('image-proxy.route.name', 'image-proxy');
 
-        Route::middleware($middleware)->group(function () use ($path, $name): void {
-            Route::get($path . '/{path}', ImageController::class)
-                ->where('path', '.*')
-                ->name($name);
+        Route::middleware(array_merge($middleware, [VerifyImageSignature::class]))
+            ->group(function () use ($path, $name): void {
+                Route::get($path . '/{path}', ImageController::class)
+                    ->where('path', '.*')
+                    ->name($name);
+            });
+    }
+
+    protected function registerBladeDirectives(): void
+    {
+        Blade::directive('imageSrcset', function (string $expression) {
+            return "<?php echo app(\ImageProxy\Services\ImageProxyManager::class)->srcsetTag({$expression}); ?>";
         });
     }
 }
