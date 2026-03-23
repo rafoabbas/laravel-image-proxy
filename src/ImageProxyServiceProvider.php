@@ -63,8 +63,6 @@ class ImageProxyServiceProvider extends ServiceProvider
 
     protected function registerBladeDirectives(): void
     {
-        Blade::directive('imageSrcset', function (string $expression) {
-            return "<?php echo app(\ImageProxy\Services\ImageProxyManager::class)->srcsetTag({$expression}); ?>";
-        });
+        Blade::directive('imageSrcset', fn (string $expression) => "<?php echo app(\ImageProxy\Services\ImageProxyManager::class)->srcsetTag({$expression}); ?>");
     }
 }

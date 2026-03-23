@@ -12,7 +12,7 @@ class UrlSigner
         ksort($params);
 
         $payload = $path . '?' . http_build_query($params);
-        $signature = hash_hmac('sha256', $payload, $key);
+        $signature = hash_hmac('sha256', $payload, (string) $key);
 
         $params['s'] = $signature;
 
@@ -35,7 +35,7 @@ class UrlSigner
         ksort($params);
 
         $payload = $path . '?' . http_build_query($params);
-        $expected = hash_hmac('sha256', $payload, $key);
+        $expected = hash_hmac('sha256', $payload, (string) $key);
 
         return hash_equals($expected, $signature);
     }

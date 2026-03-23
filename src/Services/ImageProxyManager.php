@@ -15,7 +15,7 @@ class ImageProxyManager
         }
 
         $routePath = config('image-proxy.route.path', 'img');
-        $query = $params ? '?' . http_build_query($params) : '';
+        $query = $params !== [] ? '?' . http_build_query($params) : '';
 
         return '/' . $routePath . '/' . $path . $query;
     }

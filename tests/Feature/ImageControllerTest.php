@@ -279,7 +279,7 @@ test('lqip parameter returns small image', function (): void {
         ->assertHeader('Content-Type', 'image/webp');
 
     // LQIP should be much smaller than original
-    $lqipSize = strlen($response->getContent());
+    $lqipSize = strlen((string) $response->getContent());
     expect($lqipSize)->toBeLessThan(2000);
 });
 
