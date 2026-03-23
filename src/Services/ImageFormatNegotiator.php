@@ -14,7 +14,7 @@ class ImageFormatNegotiator
         $formats = config('image-proxy.formats', ['webp']);
 
         foreach ($formats as $format) {
-            if ($format === 'avif' && str_contains($accept, 'image/avif')) {
+            if ($format === 'avif' && str_contains($accept, 'image/avif') && $this->supportsAvif()) {
                 return 'avif';
             }
 
@@ -23,7 +23,18 @@ class ImageFormatNegotiator
             }
         }
 
-        return end($formats) ?: 'webp';
+        return 'webp';
+    }
+
+    private function supportsAvif(): bool
+    {
+        $driver = config('image-proxy.driver', 'gd');
+
+        if ($driver === 'imagick') {
+            return extension_loaded('imagick') && in_array('AVIF', \Imagick::queryFormats('AVIF'));
+        }
+
+        return function_exists('imageavif');
     }
 
     public function mimeType(string $format): string

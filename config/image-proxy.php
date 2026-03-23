@@ -44,10 +44,11 @@ return [
     |
     | Priority-ordered list of output formats. The first format supported
     | by the client's Accept header will be used. Supported: "avif", "webp".
-    | AVIF requires Imagick driver with libavif support.
+    | AVIF requires Imagick with libavif, or GD with PHP 8.1+ and libavif.
+    | The negotiator automatically falls back to WebP if AVIF is unavailable.
     |
     */
-    'formats' => ['avif', 'webp'],
+    'formats' => ['webp'],
 
     /*
     |--------------------------------------------------------------------------
