@@ -3,7 +3,9 @@
     "allow": [
       "Bash(composer test:*)",
       "Bash(composer lint:test:*)",
-      "Bash(vendor/bin/rector:*)"
+      "Bash(vendor/bin/rector:*)",
+      "Bash(git tag:*)",
+      "Bash(vendor/bin/pint:*)"
     ]
   }
 }

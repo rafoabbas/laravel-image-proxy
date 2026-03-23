@@ -167,6 +167,31 @@ test('custom quality parameter', function (): void {
     $response->assertHeader('Content-Type', 'image/webp');
 });
 
+test('returns 413 when image exceeds max file size', function (): void {
+    config()->set('image-proxy.max_file_size', 10); // 10 bytes
+
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/large.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/large.jpg']))
+        ->assertStatus(413);
+});
+
+test('returns 304 when If-None-Match matches ETag', function (): void {
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/etag.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    // First request to populate cache
+    $response = $this->get(route('image-proxy', ['path' => 'test/etag.jpg']));
+    $etag = $response->headers->get('ETag');
+
+    // Second request with matching ETag
+    $this->get(route('image-proxy', ['path' => 'test/etag.jpg']), ['If-None-Match' => $etag])
+        ->assertStatus(304);
+});
+
 test('caches remote disk originals locally', function (): void {
     config()->set('image-proxy.source_disk', 's3');
     config()->set('image-proxy.remote_disks', ['s3']);

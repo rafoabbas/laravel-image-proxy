@@ -11,7 +11,7 @@ use ImageProxy\Contracts\ImageSourceResolverInterface;
 class UrlSourceResolver implements ImageSourceResolverInterface
 {
     /**
-     * Resolve an external URL: validate domain, fetch bytes (with originals cache), detect MIME.
+     * Resolve an external URL: validate domain, block internal IPs, fetch bytes (with originals cache), detect MIME.
      *
      * @return array{source: string, mime_type: string, bytes: string}|null
      */
@@ -23,8 +23,15 @@ class UrlSourceResolver implements ImageSourceResolverInterface
         $allowedDomains = array_map(strtolower(...), $config['allowed_domains'] ?? []);
 
         abort_unless(in_array($host, $allowedDomains, true), 403, 'Domain not allowed');
+        abort_if($this->isInternalHost($host), 403, 'Internal hosts are not allowed');
 
         $bytes = $this->fetchFromUrl($path, $config['cache_disk']);
+
+        abort_if(
+            strlen($bytes) > $config['max_file_size'],
+            413,
+            'Image exceeds maximum allowed file size',
+        );
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->buffer($bytes);
@@ -34,6 +41,21 @@ class UrlSourceResolver implements ImageSourceResolverInterface
             'mime_type' => $mimeType,
             'bytes' => $bytes,
         ];
+    }
+
+    private function isInternalHost(string $host): bool
+    {
+        if (in_array($host, ['localhost', '0.0.0.0', '[::1]'], true)) {
+            return true;
+        }
+
+        $ip = gethostbyname($host);
+
+        if ($ip === $host) {
+            return false;
+        }
+
+        return ! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
     }
 
     private function fetchFromUrl(string $url, string $cacheDisk): string

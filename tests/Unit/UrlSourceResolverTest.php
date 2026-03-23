@@ -85,3 +85,23 @@ test('aborts with 502 when remote fetch fails', function (): void {
     $resolver = new UrlSourceResolver;
     $resolver->resolve('https://example.com/broken.jpg');
 })->throws(HttpException::class);
+
+test('aborts with 403 for localhost SSRF attempt', function (): void {
+    config()->set('image-proxy.allowed_domains', ['localhost']);
+
+    $resolver = new UrlSourceResolver;
+    $resolver->resolve('https://localhost/admin');
+})->throws(HttpException::class);
+
+test('aborts with 413 when image exceeds max file size', function (): void {
+    config()->set('image-proxy.allowed_domains', ['example.com']);
+    config()->set('image-proxy.max_file_size', 10); // 10 bytes
+
+    $imageBytes = createJpegImageBytes();
+    Http::fake([
+        'https://example.com/huge.jpg' => Http::response($imageBytes, 200),
+    ]);
+
+    $resolver = new UrlSourceResolver;
+    $resolver->resolve('https://example.com/huge.jpg');
+})->throws(HttpException::class);

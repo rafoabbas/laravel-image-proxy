@@ -38,7 +38,7 @@ class ImageController
 
             if ($this->cache->has($cachePath)) {
                 return $this->response->respond(
-                    $this->cache->get($cachePath), $cacheKey, $config['cache_max_age'],
+                    $request, $this->cache->get($cachePath), $cacheKey, $config['cache_max_age'],
                     $this->cache->lastModified($cachePath),
                 );
             }
@@ -50,27 +50,27 @@ class ImageController
 
             abort_unless($source, 404, 'Image not found');
             abort_unless(in_array($source['mime_type'], $config['allowed_mime_types']), 415, 'Unsupported image type');
+            abort_if(strlen($source['bytes']) > $config['max_file_size'], 413, 'Image exceeds maximum allowed file size');
 
             $originalBytes = $source['bytes'];
 
             if (! $this->transformer->needsTransform($params->width, $params->height, $params->fit, $params->quality, $source['mime_type'])) {
                 $this->cache->put($cachePath, $originalBytes);
 
-                return $this->response->respond($originalBytes, $cacheKey, $config['cache_max_age']);
+                return $this->response->respond($request, $originalBytes, $cacheKey, $config['cache_max_age']);
             }
 
             $bytes = $this->transformer->transform($originalBytes, $params->width, $params->height, $params->fit, $params->quality);
             $this->cache->put($cachePath, $bytes);
 
-            return $this->response->respond($bytes, $cacheKey, $config['cache_max_age']);
+            return $this->response->respond($request, $bytes, $cacheKey, $config['cache_max_age']);
         } catch (HttpException $e) {
             throw $e;
         } catch (DecoderException) {
             abort(422, 'Invalid or corrupted image file');
         } catch (FilesystemException) {
             abort(500, 'Storage error');
-        } catch (Exception $e) {
-            dd($e);
+        } catch (Exception) {
             abort(500, 'Image processing failed');
         }
     }
