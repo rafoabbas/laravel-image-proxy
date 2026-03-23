@@ -1,0 +1,75 @@
+{
+    "name": "rafoabbas/laravel-image-proxy",
+    "description": "On-the-fly image transformation, WebP conversion, and caching proxy for Laravel",
+    "keywords": [
+        "laravel",
+        "image",
+        "proxy",
+        "resize",
+        "webp",
+        "cache",
+        "transform",
+        "thumbnail"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/rafoabbas/laravel-image-proxy",
+    "authors": [
+        {
+            "name": "Rauf Abbaszade",
+            "email": "rafo.abbas@gmail.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/rafoabbas/laravel-image-proxy/issues",
+        "source": "https://github.com/rafoabbas/laravel-image-proxy"
+    },
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/routing": "^10.0|^11.0|^12.0",
+        "intervention/image": "^3.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.27",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0",
+        "rector/rector": "^2.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "ImageProxy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ImageProxy\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ImageProxy\\ImageProxyServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test:coverage": "vendor/bin/pest --coverage",
+        "lint": "vendor/bin/pint",
+        "lint:test": "vendor/bin/pint --test",
+        "rector": "vendor/bin/rector",
+        "rector:dry": "vendor/bin/rector --dry-run",
+        "fix": "vendor/bin/rector && vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
