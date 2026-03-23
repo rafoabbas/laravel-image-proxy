@@ -6,7 +6,8 @@
       "Bash(vendor/bin/rector:*)",
       "Bash(git tag:*)",
       "Bash(vendor/bin/pint:*)",
-      "Bash(vendor/bin/pest:*)"
+      "Bash(vendor/bin/pest:*)",
+      "Bash(echo:*)"
     ]
   }
 }
