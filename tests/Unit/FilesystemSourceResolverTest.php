@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Storage;
+use ImageProxy\Data\ImageSourceData;
 use ImageProxy\Services\FilesystemSourceResolver;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\JpegEncoder;
@@ -21,7 +22,7 @@ test('resolves existing file on source disk', function (): void {
     $resolver = new FilesystemSourceResolver;
     $result = $resolver->resolve('photos/test.jpg');
 
-    expect($result)->toBeInstanceOf(\ImageProxy\Data\ImageSourceData::class)
+    expect($result)->toBeInstanceOf(ImageSourceData::class)
         ->and($result->source)->toBe('disk')
         ->and($result->disk)->toBe('public')
         ->and($result->mimeType)->toBe('image/jpeg')

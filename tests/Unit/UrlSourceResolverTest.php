@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use ImageProxy\Data\ImageSourceData;
 use ImageProxy\Services\UrlSourceResolver;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\JpegEncoder;
@@ -32,7 +33,7 @@ test('resolves external url with allowed domain', function (): void {
     $resolver = new UrlSourceResolver;
     $result = $resolver->resolve('https://example.com/photo.jpg');
 
-    expect($result)->toBeInstanceOf(\ImageProxy\Data\ImageSourceData::class)
+    expect($result)->toBeInstanceOf(ImageSourceData::class)
         ->and($result->source)->toBe('url')
         ->and($result->mimeType)->toBe('image/jpeg')
         ->and($result->bytes)->toBe($imageBytes);

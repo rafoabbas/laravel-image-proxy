@@ -12,7 +12,7 @@ use ImageProxy\Services\ImageProxyManager;
  * @method static string srcset(string $path, array $widths, array $params = [])
  * @method static string srcsetTag(string $path, array $widths, array $params = [], string $sizes = '100vw', string $alt = '')
  *
- * @see \ImageProxy\Services\ImageProxyManager
+ * @see ImageProxyManager
  */
 class ImageProxy extends Facade
 {
