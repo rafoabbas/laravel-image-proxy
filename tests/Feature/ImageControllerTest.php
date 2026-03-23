@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Storage;
 use ImageProxy\Data\ImageSourceData;
 use ImageProxy\Services\FilesystemSourceResolver;
+use ImageProxy\Services\UrlSigner;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\JpegEncoder;
 use Intervention\Image\Encoders\WebpEncoder;
@@ -212,4 +213,94 @@ test('caches remote disk originals locally', function (): void {
         ->assertOk();
 
     Storage::disk('image-proxy-cache')->assertExists('originals/uploads/photo.jpg');
+});
+
+test('includes Vary Accept header in response', function (): void {
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/vary.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/vary.jpg']))
+        ->assertOk()
+        ->assertHeader('Vary', 'Accept');
+});
+
+test('returns 403 when signing enabled and no signature provided', function (): void {
+    config()->set('image-proxy.signing.enabled', true);
+    config()->set('image-proxy.signing.key', 'test-secret');
+
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/signed.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/signed.jpg']))
+        ->assertStatus(403);
+});
+
+test('serves image with valid signature when signing enabled', function (): void {
+    config()->set('image-proxy.signing.enabled', true);
+    config()->set('image-proxy.signing.key', 'test-secret');
+
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/signed.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $signer = new UrlSigner;
+    $url = $signer->sign('test/signed.jpg', ['w' => 300]);
+
+    $this->get($url)
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+});
+
+test('returns 403 when signature is tampered', function (): void {
+    config()->set('image-proxy.signing.enabled', true);
+    config()->set('image-proxy.signing.key', 'test-secret');
+
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/tampered.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', [
+        'path' => 'test/tampered.jpg',
+        'w' => 300,
+        's' => 'invalid-signature',
+    ]))->assertStatus(403);
+});
+
+test('lqip parameter returns small image', function (): void {
+    $imageBytes = createTestImage(800, 600);
+    Storage::disk('public')->put('test/lqip.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $response = $this->get(route('image-proxy', ['path' => 'test/lqip.jpg', 'lqip' => 1]));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'image/webp');
+
+    // LQIP should be much smaller than original
+    $lqipSize = strlen($response->getContent());
+    expect($lqipSize)->toBeLessThan(2000);
+});
+
+test('returns 422 when image exceeds max pixel count', function (): void {
+    config()->set('image-proxy.max_pixel_count', 100); // Very low
+
+    $imageBytes = createTestImage(200, 200); // 40000 pixels
+    Storage::disk('public')->put('test/huge.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/huge.jpg']))
+        ->assertStatus(422);
+});
+
+test('signing middleware passes through when signing disabled', function (): void {
+    config()->set('image-proxy.signing.enabled', false);
+
+    $imageBytes = createTestImage();
+    Storage::disk('public')->put('test/nosign.jpg', $imageBytes);
+    fakeFilesystemResolver('public', 'image/jpeg');
+
+    $this->get(route('image-proxy', ['path' => 'test/nosign.jpg']))
+        ->assertOk();
 });
